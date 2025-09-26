@@ -1,126 +1,342 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>My Shop</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 700px; margin:auto; }
-    .product { border:1px solid #ccc; padding:10px; margin:10px; border-radius:5px; }
-    #cart { border:1px solid #333; padding:10px; margin:20px 0; border-radius:5px; }
-    button { margin-top:5px; padding:5px 10px; }
-    input, textarea, select { width:100%; padding:8px; margin:5px 0; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Shop — Cart</title>
+<style>
+  /* Internal styles (safe for embedding) */
+  :root { font-family: Arial, Helvetica, sans-serif; color:#222; }
+  body { max-width:980px; margin:18px auto; padding:16px; }
+  h1,h2 { margin:8px 0; }
+  .grid { display:flex; gap:12px; flex-wrap:wrap; }
+  .product { border:1px solid #ddd; padding:12px; border-radius:8px; width: 300px; box-sizing:border-box;}
+  .product small { color:#666; display:block; margin-top:6px; }
+  .btn { display:inline-block; padding:8px 12px; border-radius:6px; cursor:pointer; border:none; }
+  .btn-primary { background:#007bff; color:#fff; }
+  .btn-ghost { background:transparent; border:1px solid #ccc; }
+  #cartBox { border:1px solid #333; padding:12px; border-radius:8px; margin-top:12px; }
+  .cart-item { display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid #eee; padding:8px 0; }
+  .qty { width:64px; }
+  label { font-weight:600; display:block; margin-top:8px; }
+  input[type="text"], input[type="tel"], textarea, input[type="number"], select {
+    width:100%; padding:8px; margin-top:6px; box-sizing:border-box;
+  }
+  .small { font-size:13px; color:#666; }
+  footer.note { margin-top:14px; color:#444; font-size:13px; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .remove-link { color:#c00; cursor:pointer; font-size:13px; }
+  .totals { margin-top:10px; font-weight:700; }
+  .center { text-align:center; }
+</style>
 </head>
 <body>
-  <h1>My Online Shop</h1>
 
-  <!-- Products -->
-  <div class="product">
-    <p><strong>Product A</strong> - Rs 500</p>
-    <input type="number" id="qtyA" value="1" min="1">
-    <button onclick="addToCart('A','Product A',500)">Add to Cart</button>
+<h1>My Shop — Cart</h1>
+
+<!-- CONFIG: change prices or products here -->
+<script>
+  // Product catalog — you can expand this
+  const PRODUCTS = [
+    { id: "P001", name: "Product A", price: 500, desc: "Compact, durable" },
+    { id: "P002", name: "Product B", price: 750, desc: "Popular choice" },
+    { id: "P003", name: "Product C", price: 1200, desc: "Premium" }
+  ];
+
+  // Express fee (set to what you want)
+  const expressFee = 300;
+
+  // Replace this with your form endpoint (Formspree or custom). Example:
+  // const FORM_ENDPOINT = "https://formspree.io/f/yourid";
+  const FORM_ENDPOINT = "https://formspree.io/f/mgvnowoy";
+</script>
+
+<!-- Product list -->
+<h2>Products</h2>
+<div id="products" class="grid"></div>
+
+<!-- Cart -->
+<h2>Cart</h2>
+<div id="cartBox">
+  <div id="cartContent" class="small">Cart is empty.</div>
+  <div class="totals">Subtotal: Rs <span id="subtotal">0</span></div>
+  <div class="totals small">Delivery: Rs <span id="deliveryFee">0</span></div>
+  <div class="totals">Total: Rs <span id="grandTotal">0</span></div>
+  <div style="margin-top:8px;">
+    <button class="btn btn-ghost" onclick="clearCart()">Clear cart</button>
   </div>
-  <div class="product">
-    <p><strong>Product B</strong> - Rs 750</p>
-    <input type="number" id="qtyB" value="1" min="1">
-    <button onclick="addToCart('B','Product B',750)">Add to Cart</button>
+</div>
+
+<!-- Checkout form -->
+<h2>Checkout</h2>
+<form id="checkoutForm" method="POST" enctype="multipart/form-data" class="small">
+  <input type="hidden" name="order_json" id="order_json">
+
+  <label>WhatsApp Number (include country code)</label>
+  <input type="tel" name="whatsapp" id="whatsapp" placeholder="+230 5xx xxxx" required>
+
+  <div class="row">
+    <div>
+      <label>First name</label>
+      <input type="text" name="first_name" id="first_name" required>
+    </div>
+    <div>
+      <label>Last name</label>
+      <input type="text" name="last_name" id="last_name" required>
+    </div>
   </div>
-  <div class="product">
-    <p><strong>Product C</strong> - Rs 1200</p>
-    <input type="number" id="qtyC" value="1" min="1">
-    <button onclick="addToCart('C','Product C',1200)">Add to Cart</button>
+
+  <label>Mailing Address</label>
+  <textarea name="address" id="address" rows="3" required></textarea>
+
+  <label>Postal Code</label>
+  <input type="text" name="postal" id="postal" required>
+
+  <label>Delivery Method</label>
+  <div class="small">
+    <label><input type="radio" name="delivery" value="standard" checked onchange="updateTotals()"> Standard (Free)</label><br>
+    <label><input type="radio" name="delivery" value="express" onchange="updateTotals()"> Express (+ Rs <span id="expressLabel"></span>)</label>
   </div>
 
-  <!-- Cart -->
-  <h2>Cart</h2>
-  <div id="cart">Cart is empty</div>
-  <p><strong>Total: Rs <span id="total">0</span></strong></p>
+  <label>Upload proof of payment</label>
+  <input type="file" name="payment_proof" id="payment_proof" accept="image/*,application/pdf" required>
 
-  <!-- Checkout Form -->
-  <h2>Checkout</h2>
-  <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST" enctype="multipart/form-data">
-    <!-- Cart data gets injected here -->
-    <textarea name="order" id="orderData" readonly style="height:100px;"></textarea><br>
+  <div style="margin-top:12px;">
+    <button type="button" class="btn btn-primary" onclick="prepareAndSubmit()">Submit Order</button>
+  </div>
+  <p class="small">After submission you will receive a WhatsApp message to confirm your order.</p>
+</form>
 
-    <label>WhatsApp Number:</label>
-    <input type="text" name="whatsapp" required>
+<footer class="note">
+  Note: Google Sites strips inline scripts — host this file (GitHub Pages / Netlify) and embed the hosted URL into Google Sites.
+</footer>
 
-    <label>Full Name:</label>
-    <input type="text" name="fullname" required>
+<script>
+/* ===== Cart logic ===== */
+const storageKey = "myshop_cart_v1";
 
-    <label>Mailing Address:</label>
-    <textarea name="address" required></textarea>
+// initialize UI pieces
+document.getElementById('expressLabel').textContent = expressFee;
 
-    <label>Postal Code:</label>
-    <input type="text" name="postal" required>
+let cart = {}; // { id: {id,name,price,qty} }
 
-    <label>Delivery Method:</label><br>
-    <input type="radio" name="delivery" value="Standard" checked> Standard (Free)<br>
-    <input type="radio" name="delivery" value="Express"> Express (+ Extra Fee)<br><br>
+function loadCart() {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    cart = raw ? JSON.parse(raw) : {};
+  } catch (e) { cart = {}; }
+}
 
-    <label>Upload Proof of Payment:</label>
-    <input type="file" name="payment" required><br><br>
+function saveCart() {
+  localStorage.setItem(storageKey, JSON.stringify(cart));
+}
 
-    <input type="submit" value="Submit Order">
-  </form>
+/* render products list */
+function renderProducts(){
+  const container = document.getElementById('products');
+  container.innerHTML = "";
+  PRODUCTS.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'product';
+    // Inline HTML so embedding is simple
+    div.innerHTML = `
+      <strong>${p.name}</strong>
+      <small> ID: ${p.id} • Rs ${p.price}</small>
+      <div class="small" style="margin-top:8px;">${p.desc || ""}</div>
+      <div style="margin-top:8px;">
+        <input type="number" id="qty_${p.id}" min="1" value="1" style="width:80px;padding:6px;">
+        <button class="btn btn-primary" onclick="addToCart('${p.id}')">Add to cart</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
 
-  <p style="margin-top:20px; font-size:14px; color:gray;">
-    You will receive a WhatsApp message to confirm your order.
-  </p>
+/* add to cart using product id */
+function addToCart(id) {
+  const prod = PRODUCTS.find(x => x.id === id);
+  if (!prod) return alert("Product not found");
+  const qtyInput = document.getElementById('qty_' + id);
+  let qty = parseInt(qtyInput.value) || 1;
+  if (qty < 1) qty = 1;
 
-  <script>
-    let cart = JSON.parse(localStorage.getItem("cart")) || {};
-    let total = 0;
+  if (cart[id]) cart[id].qty += qty;
+  else cart[id] = { id: prod.id, name: prod.name, price: prod.price, qty };
 
-    function renderCart() {
-      let cartDiv = document.getElementById("cart");
-      let totalDiv = document.getElementById("total");
-      let orderBox = document.getElementById("orderData");
+  saveCart();
+  renderCart();
+}
 
-      if (Object.keys(cart).length === 0) {
-        cartDiv.innerHTML = "Cart is empty";
-        totalDiv.textContent = 0;
-        orderBox.value = "";
-        return;
-      }
+/* update quantity inside cart */
+function updateQty(id, newQty) {
+  newQty = parseInt(newQty) || 0;
+  if (newQty <= 0) {
+    delete cart[id];
+  } else {
+    cart[id].qty = newQty;
+  }
+  saveCart();
+  renderCart();
+}
 
-      let html = "";
-      total = 0;
-      for (let id in cart) {
-        let item = cart[id];
-        let subtotal = item.price * item.qty;
-        total += subtotal;
-        html += `${item.name} x ${item.qty} = Rs ${subtotal} 
-        <button onclick="removeFromCart('${id}')">Remove</button><br>`;
-      }
+/* remove item */
+function removeItem(id) {
+  delete cart[id];
+  saveCart();
+  renderCart();
+}
 
-      cartDiv.innerHTML = html;
-      totalDiv.textContent = total;
-      orderBox.value = JSON.stringify(cart, null, 2) + "\nTotal: Rs " + total;
-    }
+/* clear entire cart */
+function clearCart() {
+  if (!confirm("Clear the cart?")) return;
+  cart = {};
+  saveCart();
+  renderCart();
+}
 
-    function addToCart(id, name, price) {
-      let qtyInput = document.getElementById("qty" + id);
-      let qty = parseInt(qtyInput.value);
+/* calculate totals */
+function calculateTotals() {
+  let subtotal = 0;
+  for (const k in cart) subtotal += cart[k].price * cart[k].qty;
+  const deliveryMethod = document.querySelector('input[name="delivery"]:checked')?.value || 'standard';
+  const deliveryFee = (deliveryMethod === 'express') ? expressFee : 0;
+  const grand = subtotal + deliveryFee;
+  return { subtotal, deliveryFee, grand };
+}
 
-      if (cart[id]) {
-        cart[id].qty += qty;
-      } else {
-        cart[id] = { name: name, price: price, qty: qty };
-      }
+/* render cart */
+function renderCart() {
+  const box = document.getElementById('cartContent');
+  if (!box) return;
+  if (Object.keys(cart).length === 0) {
+    box.innerHTML = "<div class='small'>Cart is empty.</div>";
+    document.getElementById('subtotal').textContent = "0";
+    document.getElementById('deliveryFee').textContent = "0";
+    document.getElementById('grandTotal').textContent = "0";
+    document.getElementById('order_json').value = "";
+    return;
+  }
+  let html = "";
+  for (const k in cart) {
+    const it = cart[k];
+    html += `<div class="cart-item">
+      <div style="min-width:160px;">
+        <strong>${it.name}</strong><div class="small">ID: ${it.id}</div>
+      </div>
+      <div style="flex:1;">
+        <div class="small">Rs ${it.price} each</div>
+      </div>
+      <div style="width:120px;">
+        <input class="qty" type="number" value="${it.qty}" min="1" onchange="updateQty('${k}', this.value)">
+        <div><span class="remove-link" onclick="removeItem('${k}')">Remove</span></div>
+      </div>
+      <div style="width:90px; text-align:right;">Rs ${it.price * it.qty}</div>
+    </div>`;
+  }
+  box.innerHTML = html;
+  const totals = calculateTotals();
+  document.getElementById('subtotal').textContent = totals.subtotal;
+  document.getElementById('deliveryFee').textContent = totals.deliveryFee;
+  document.getElementById('grandTotal').textContent = totals.grand;
+  // set hidden order_json for form submission preview
+  document.getElementById('order_json').value = JSON.stringify({cart, totals}, null, 2);
+}
 
-      localStorage.setItem("cart", JSON.stringify(cart));
+/* when delivery option changes */
+function updateTotals() {
+  renderCart();
+}
+
+/* checkout: prepares form and submits to the FORM_ENDPOINT via fetch (multipart) */
+async function prepareAndSubmit() {
+  if (!FORM_ENDPOINT || FORM_ENDPOINT === "FORM_ENDPOINT") {
+    alert("You must set the FORM_ENDPOINT in the script before submitting (Formspree endpoint).");
+    return;
+  }
+  if (Object.keys(cart).length === 0) { alert("Cart is empty"); return; }
+
+  // validate form basics
+  const form = document.getElementById('checkoutForm');
+  if (!form.checkValidity()) {
+    form.reportValidity();
+    return;
+  }
+
+  // Build FormData to send (supports file)
+  const fd = new FormData();
+  // Basic customer fields
+  fd.append("whatsapp", document.getElementById('whatsapp').value);
+  fd.append("first_name", document.getElementById('first_name').value);
+  fd.append("last_name", document.getElementById('last_name').value);
+  fd.append("address", document.getElementById('address').value);
+  fd.append("postal", document.getElementById('postal').value);
+  fd.append("delivery", document.querySelector('input[name="delivery"]:checked').value);
+  // order payload
+  const totals = calculateTotals();
+  fd.append("order_json", JSON.stringify({cart, totals}, null, 2));
+  // file
+  const fileInput = document.getElementById('payment_proof');
+  if (fileInput.files.length > 0) {
+    fd.append("payment_proof", fileInput.files[0], fileInput.files[0].name);
+  }
+
+  // Optional: add a field so Formspree forwards to your email subject or tags
+  fd.append("_subject", "New order from website");
+  fd.append("_format", "plain");
+
+  // Send to form endpoint
+  try {
+    // If Formspree: they accept form POST. Adjust headers if your endpoint requires JSON.
+    const resp = await fetch(FORM_ENDPOINT, {
+      method: "POST",
+      body: fd
+    });
+    if (resp.ok) {
+      // success: clear cart locally and show confirmation + WhatsApp link
+      const data = await resp.text(); // not always JSON
+      // capture copy of order for local record if needed
+      const copy = { cart, totals, customer: {
+        whatsapp: document.getElementById('whatsapp').value,
+        name: document.getElementById('first_name').value + " " + document.getElementById('last_name').value,
+        address: document.getElementById('address').value
+      }, timestamp: new Date().toISOString() };
+      // Save last order locally too
+      localStorage.setItem("last_order", JSON.stringify(copy));
+      // clear cart or keep depending on preference
+      cart = {};
+      saveCart();
       renderCart();
-    }
+      alert("Order submitted. We'll confirm via WhatsApp shortly.");
 
-    function removeFromCart(id) {
-      delete cart[id];
-      localStorage.setItem("cart", JSON.stringify(cart));
-      renderCart();
+      // Prepare WhatsApp message (you can change sellerNumber)
+      const sellerNumber = encodeURIComponent(document.getElementById('whatsapp').value); // or your own number
+      const msg = encodeURIComponent(`New order from ${copy.customer.name}.\nTotal: Rs ${copy.totals.grand}\nOrder details:\n${JSON.stringify(copy.cart, null, 2)}\nAddress: ${copy.customer.address}`);
+      // open WhatsApp web/send (this opens chat with sellerNumber) — useful for quick confirm
+      const waUrl = `https://wa.me/${sellerNumber.replace(/\D/g,'')}?text=${msg}`;
+      // open in new tab
+      window.open(waUrl, "_blank");
+    } else {
+      const text = await resp.text();
+      console.error("Submit failed:", resp.status, text);
+      alert("Submission failed. Check console for details.");
     }
+  } catch (err) {
+    console.error("Error sending form", err);
+    alert("Error sending order. See console for details.");
+  }
+}
 
-    // Render cart on page load
-    renderCart();
-  </script>
+/* on load */
+(function init(){
+  loadCart();
+  renderProducts();
+  renderCart();
+
+  // if someone changes delivery radio by editing HTML (safety)
+  document.querySelectorAll('input[name="delivery"]').forEach(r => r.addEventListener('change', updateTotals));
+})();
+</script>
+
 </body>
 </html>
