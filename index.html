@@ -4,37 +4,123 @@
   <meta charset="UTF-8">
   <title>My Shop</title>
   <style>
-    body { font-family: Arial, sans-serif; }
-    .product { border: 1px solid #ccc; padding: 10px; margin: 10px; }
-    #cart { border: 1px solid #333; padding: 10px; margin: 20px 0; }
+    body { font-family: Arial, sans-serif; max-width: 700px; margin:auto; }
+    .product { border:1px solid #ccc; padding:10px; margin:10px; border-radius:5px; }
+    #cart { border:1px solid #333; padding:10px; margin:20px 0; border-radius:5px; }
+    button { margin-top:5px; padding:5px 10px; }
+    input, textarea, select { width:100%; padding:8px; margin:5px 0; }
   </style>
 </head>
 <body>
   <h1>My Online Shop</h1>
 
+  <!-- Products -->
   <div class="product">
-    <p>Product A - Rs 500</p>
-    <button onclick="addToCart('Product A', 500)">Add to Cart</button>
+    <p><strong>Product A</strong> - Rs 500</p>
+    <input type="number" id="qtyA" value="1" min="1">
+    <button onclick="addToCart('A','Product A',500)">Add to Cart</button>
   </div>
   <div class="product">
-    <p>Product B - Rs 750</p>
-    <button onclick="addToCart('Product B', 750)">Add to Cart</button>
+    <p><strong>Product B</strong> - Rs 750</p>
+    <input type="number" id="qtyB" value="1" min="1">
+    <button onclick="addToCart('B','Product B',750)">Add to Cart</button>
+  </div>
+  <div class="product">
+    <p><strong>Product C</strong> - Rs 1200</p>
+    <input type="number" id="qtyC" value="1" min="1">
+    <button onclick="addToCart('C','Product C',1200)">Add to Cart</button>
   </div>
 
+  <!-- Cart -->
   <h2>Cart</h2>
   <div id="cart">Cart is empty</div>
-  <p>Total: Rs <span id="total">0</span></p>
+  <p><strong>Total: Rs <span id="total">0</span></strong></p>
+
+  <!-- Checkout Form -->
+  <h2>Checkout</h2>
+  <form action="https://formspree.io/f/YOUR_FORM_ID" method="POST" enctype="multipart/form-data">
+    <!-- Cart data gets injected here -->
+    <textarea name="order" id="orderData" readonly style="height:100px;"></textarea><br>
+
+    <label>WhatsApp Number:</label>
+    <input type="text" name="whatsapp" required>
+
+    <label>Full Name:</label>
+    <input type="text" name="fullname" required>
+
+    <label>Mailing Address:</label>
+    <textarea name="address" required></textarea>
+
+    <label>Postal Code:</label>
+    <input type="text" name="postal" required>
+
+    <label>Delivery Method:</label><br>
+    <input type="radio" name="delivery" value="Standard" checked> Standard (Free)<br>
+    <input type="radio" name="delivery" value="Express"> Express (+ Extra Fee)<br><br>
+
+    <label>Upload Proof of Payment:</label>
+    <input type="file" name="payment" required><br><br>
+
+    <input type="submit" value="Submit Order">
+  </form>
+
+  <p style="margin-top:20px; font-size:14px; color:gray;">
+    You will receive a WhatsApp message to confirm your order.
+  </p>
 
   <script>
-    let cart = [];
+    let cart = JSON.parse(localStorage.getItem("cart")) || {};
     let total = 0;
 
-    function addToCart(product, price) {
-      cart.push(product + " - Rs " + price);
-      total += price;
-      document.getElementById("cart").innerHTML = cart.join("<br>");
-      document.getElementById("total").textContent = total;
+    function renderCart() {
+      let cartDiv = document.getElementById("cart");
+      let totalDiv = document.getElementById("total");
+      let orderBox = document.getElementById("orderData");
+
+      if (Object.keys(cart).length === 0) {
+        cartDiv.innerHTML = "Cart is empty";
+        totalDiv.textContent = 0;
+        orderBox.value = "";
+        return;
+      }
+
+      let html = "";
+      total = 0;
+      for (let id in cart) {
+        let item = cart[id];
+        let subtotal = item.price * item.qty;
+        total += subtotal;
+        html += `${item.name} x ${item.qty} = Rs ${subtotal} 
+        <button onclick="removeFromCart('${id}')">Remove</button><br>`;
+      }
+
+      cartDiv.innerHTML = html;
+      totalDiv.textContent = total;
+      orderBox.value = JSON.stringify(cart, null, 2) + "\nTotal: Rs " + total;
     }
+
+    function addToCart(id, name, price) {
+      let qtyInput = document.getElementById("qty" + id);
+      let qty = parseInt(qtyInput.value);
+
+      if (cart[id]) {
+        cart[id].qty += qty;
+      } else {
+        cart[id] = { name: name, price: price, qty: qty };
+      }
+
+      localStorage.setItem("cart", JSON.stringify(cart));
+      renderCart();
+    }
+
+    function removeFromCart(id) {
+      delete cart[id];
+      localStorage.setItem("cart", JSON.stringify(cart));
+      renderCart();
+    }
+
+    // Render cart on page load
+    renderCart();
   </script>
 </body>
 </html>
