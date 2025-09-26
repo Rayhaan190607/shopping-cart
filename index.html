@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>My Shop</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .product { border: 1px solid #ccc; padding: 10px; margin: 10px; }
+    #cart { border: 1px solid #333; padding: 10px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>My Online Shop</h1>
+
+  <div class="product">
+    <p>Product A - Rs 500</p>
+    <button onclick="addToCart('Product A', 500)">Add to Cart</button>
+  </div>
+  <div class="product">
+    <p>Product B - Rs 750</p>
+    <button onclick="addToCart('Product B', 750)">Add to Cart</button>
+  </div>
+
+  <h2>Cart</h2>
+  <div id="cart">Cart is empty</div>
+  <p>Total: Rs <span id="total">0</span></p>
+
+  <script>
+    let cart = [];
+    let total = 0;
+
+    function addToCart(product, price) {
+      cart.push(product + " - Rs " + price);
+      total += price;
+      document.getElementById("cart").innerHTML = cart.join("<br>");
+      document.getElementById("total").textContent = total;
+    }
+  </script>
+</body>
+</html>
